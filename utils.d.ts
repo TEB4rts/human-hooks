@@ -1,0 +1,10 @@
+import type { JsonValue, ReviewSeverity } from './types.js';
+export declare function createId(prefix?: string): string;
+export declare function getPathValue(input: unknown, path: string): JsonValue | undefined;
+export declare function stableStringify(value: unknown): string;
+export declare function hashString(value: string): string;
+export declare function computeFingerprint(input: unknown): string;
+export declare function nowIso(date?: Date): string;
+export declare function addMilliseconds(date: Date, ms: number): Date;
+export declare function maxSeverity(a: ReviewSeverity, b: ReviewSeverity): ReviewSeverity;
+export declare function jsonClone<T>(value: T): T;

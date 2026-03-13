@@ -1,0 +1,68 @@
+{
+  "name": "human-hooks",
+  "version": "0.2.0",
+  "description": "Human approval hooks for AI tools, automations, agent runtimes, and future-facing workflows.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./http": {
+      "types": "./dist/http/node.d.ts",
+      "import": "./dist/http/node.js"
+    },
+    "./fetch": {
+      "types": "./dist/http/fetch.d.ts",
+      "import": "./dist/http/fetch.js"
+    },
+    "./tokens": {
+      "types": "./dist/tokens.d.ts",
+      "import": "./dist/tokens.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "import": "./dist/events.js"
+    },
+    "./adapters": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./stores/file": {
+      "types": "./dist/stores/file.d.ts",
+      "import": "./dist/stores/file.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/**/*.test.mjs",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "example:basic": "npm run build && node examples/basic.mjs",
+    "example:claude": "npm run build && node examples/claude-compatible.mjs",
+    "example:n8n": "npm run build && node examples/n8n-webhook.mjs"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "approval",
+    "human-in-the-loop",
+    "workflow",
+    "policy",
+    "n8n",
+    "claude",
+    "automation"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}
