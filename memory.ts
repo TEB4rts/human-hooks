@@ -19,6 +19,12 @@ export class MemoryReviewStore implements ReviewStore {
       .map((review) => jsonClone(review));
   }
 
+  async listAll(queue?: string): Promise<ReviewRecord[]> {
+    return Array.from(this.reviews.values())
+      .filter((review) => !queue || review.queue === queue)
+      .map((review) => jsonClone(review));
+  }
+
   async put(review: ReviewRecord): Promise<ReviewRecord> {
     this.reviews.set(review.id, jsonClone(review));
     return jsonClone(review);

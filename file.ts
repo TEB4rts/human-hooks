@@ -29,6 +29,13 @@ export class FileReviewStore implements ReviewStore {
       .map((review) => jsonClone(review));
   }
 
+  async listAll(queue?: string): Promise<ReviewRecord[]> {
+    const db = await this.readDb();
+    return db.reviews
+      .filter((review) => !queue || review.queue === queue)
+      .map((review) => jsonClone(review));
+  }
+
   async put(review: ReviewRecord): Promise<ReviewRecord> {
     const db = await this.readDb();
     const index = db.reviews.findIndex((item) => item.id === review.id);

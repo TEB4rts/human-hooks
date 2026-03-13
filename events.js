@@ -6,8 +6,16 @@ export class MemoryEventSink {
         this.events.push(event);
     }
 }
+export class ConsoleEventSink {
+    async publish(event) {
+        console.log(`[human-hooks] ${event.type} ${event.reviewId} ${event.status} score=${event.riskScore}`);
+    }
+}
 export function memoryEventSink() {
     return new MemoryEventSink();
+}
+export function consoleEventSink() {
+    return new ConsoleEventSink();
 }
 export function createEventFanout(...sinks) {
     return {

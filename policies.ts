@@ -45,6 +45,19 @@ export function eq<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = J
   return (context) => context.value(path) === expected;
 }
 
+export function oneOf<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  values: JsonValue[],
+): Condition<TPayload, TMeta> {
+  return (context) => values.includes(context.value(path) as JsonValue);
+}
+
+export function pathExists<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+): Condition<TPayload, TMeta> {
+  return (context) => typeof context.value(path) !== 'undefined';
+}
+
 export function includes<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
   path: string,
   expected: JsonValue,
@@ -52,6 +65,46 @@ export function includes<TPayload extends JsonMap = JsonMap, TMeta extends JsonM
   return (context) => {
     const value = context.value(path);
     return Array.isArray(value) && value.includes(expected);
+  };
+}
+
+export function arrayLengthAbove<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  minimumExclusive: number,
+): Condition<TPayload, TMeta> {
+  return (context) => {
+    const value = context.value(path);
+    return Array.isArray(value) && value.length > minimumExclusive;
+  };
+}
+
+export function stringIncludes<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  expectedFragment: string,
+): Condition<TPayload, TMeta> {
+  return (context) => {
+    const value = context.value(path);
+    return typeof value === 'string' && value.includes(expectedFragment);
+  };
+}
+
+export function stringStartsWith<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  prefix: string,
+): Condition<TPayload, TMeta> {
+  return (context) => {
+    const value = context.value(path);
+    return typeof value === 'string' && value.startsWith(prefix);
+  };
+}
+
+export function matchesRegex<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  expression: RegExp,
+): Condition<TPayload, TMeta> {
+  return (context) => {
+    const value = context.value(path);
+    return typeof value === 'string' && expression.test(value);
   };
 }
 
@@ -75,6 +128,17 @@ export function numberBelow<TPayload extends JsonMap = JsonMap, TMeta extends Js
   };
 }
 
+export function numberBetween<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  minimumInclusive: number,
+  maximumInclusive: number,
+): Condition<TPayload, TMeta> {
+  return (context) => {
+    const value = context.value(path);
+    return typeof value === 'number' && value >= minimumInclusive && value <= maximumInclusive;
+  };
+}
+
 export function truthy<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
   path: string,
 ): Condition<TPayload, TMeta> {
@@ -85,6 +149,18 @@ export function actionIs<TPayload extends JsonMap = JsonMap, TMeta extends JsonM
   action: string,
 ): Condition<TPayload, TMeta> {
   return (context) => context.request.action === action;
+}
+
+export function actionIn<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  actions: string[],
+): Condition<TPayload, TMeta> {
+  return (context) => actions.includes(context.request.action);
+}
+
+export function actionMatches<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  expression: RegExp,
+): Condition<TPayload, TMeta> {
+  return (context) => expression.test(context.request.action);
 }
 
 export function actorTypeIs<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
@@ -99,10 +175,28 @@ export function providerIs<TPayload extends JsonMap = JsonMap, TMeta extends Jso
   return (context) => context.request.provider === provider;
 }
 
+export function providerIn<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  providers: string[],
+): Condition<TPayload, TMeta> {
+  return (context) => typeof context.request.provider === 'string' && providers.includes(context.request.provider);
+}
+
+export function providerMatches<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  expression: RegExp,
+): Condition<TPayload, TMeta> {
+  return (context) => typeof context.request.provider === 'string' && expression.test(context.request.provider);
+}
+
 export function tagIncludes<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
   tag: string,
 ): Condition<TPayload, TMeta> {
   return (context) => Array.isArray(context.request.tags) && context.request.tags.includes(tag);
+}
+
+export function tagAny<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  tags: string[],
+): Condition<TPayload, TMeta> {
+  return (context) => Array.isArray(context.request.tags) && tags.some((tag) => context.request.tags?.includes(tag));
 }
 
 export function resourceTypeIs<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
@@ -123,6 +217,28 @@ export function confidenceBelow<TPayload extends JsonMap = JsonMap, TMeta extend
   path = 'meta.confidence',
 ): Condition<TPayload, TMeta> {
   return numberBelow(path, maximumExclusive);
+}
+
+export function recipientCountAbove<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  minimumExclusive: number,
+  path = 'payload.recipientCount',
+): Condition<TPayload, TMeta> {
+  return numberAbove(path, minimumExclusive);
+}
+
+export function externalDomainNotAllowed<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+  path: string,
+  allowlist: string[],
+): Condition<TPayload, TMeta> {
+  const normalized = allowlist.map((value) => value.toLowerCase());
+  return (context) => {
+    const value = context.value(path);
+    if (typeof value !== 'string' || !value.includes('@')) {
+      return false;
+    }
+    const domain = value.split('@').pop()?.toLowerCase();
+    return Boolean(domain) && !normalized.includes(domain as string);
+  };
 }
 
 export function flag<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(

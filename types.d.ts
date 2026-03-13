@@ -53,6 +53,15 @@ export interface PolicyMatch {
     expiresInMs?: number;
     tags?: string[];
 }
+export interface ReviewHistoryEntry {
+    id: string;
+    type: ReviewEventName;
+    at: string;
+    status: ReviewStatus;
+    actor?: ReviewActor;
+    note?: string;
+    data?: JsonMap;
+}
 export interface ReviewRecord<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap> {
     id: string;
     status: ReviewStatus;
@@ -72,6 +81,7 @@ export interface ReviewRecord<TPayload extends JsonMap = JsonMap, TMeta extends 
     approvals: ReviewApproval[];
     resolution?: ReviewResolution;
     execution?: ReviewExecution;
+    history: ReviewHistoryEntry[];
 }
 export interface ReviewStore {
     create(review: ReviewRecord): Promise<void>;
@@ -79,6 +89,7 @@ export interface ReviewStore {
     listPending(queue?: string): Promise<ReviewRecord[]>;
     put(review: ReviewRecord): Promise<ReviewRecord>;
     findPendingByFingerprint?(fingerprint: string): Promise<ReviewRecord | null>;
+    listAll?(queue?: string): Promise<ReviewRecord[]>;
 }
 export interface PolicyContext<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap> {
     request: GuardRequest<TPayload, TMeta>;
@@ -154,4 +165,15 @@ export interface SignedReviewTokenPayload extends JsonMap {
 }
 export interface FetchHandlerOptions {
     tokenSecret?: string;
+    appTitle?: string;
+}
+export interface ReviewStats {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    expired: number;
+    executed: number;
+    bySeverity: Record<ReviewSeverity, number>;
+    byQueue: Record<string, number>;
 }

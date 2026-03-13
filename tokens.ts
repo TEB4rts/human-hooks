@@ -39,3 +39,15 @@ export function verifySignedReviewToken(token: string, secret: string): SignedRe
 
   return payload;
 }
+
+export function createSignedReviewActionLink(
+  baseUrl: string,
+  payload: SignedReviewTokenPayload,
+  secret: string,
+): string {
+  const url = new URL(baseUrl);
+  url.searchParams.set('token', createSignedReviewToken(payload, secret));
+  url.searchParams.set('reviewId', payload.reviewId);
+  url.searchParams.set('action', payload.action);
+  return url.toString();
+}

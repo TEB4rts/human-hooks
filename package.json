@@ -1,7 +1,7 @@
 {
   "name": "human-hooks",
-  "version": "0.2.0",
-  "description": "Human approval hooks for AI tools, automations, agent runtimes, and future-facing workflows.",
+  "version": "0.4.0",
+  "description": "Universal validation, approval, and audit hooks for AI agents, automations, workflow tools, and future-facing runtimes.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -47,17 +47,24 @@
     "check": "tsc -p tsconfig.json --noEmit",
     "example:basic": "npm run build && node examples/basic.mjs",
     "example:claude": "npm run build && node examples/claude-compatible.mjs",
-    "example:n8n": "npm run build && node examples/n8n-webhook.mjs"
+    "example:n8n": "npm run build && node examples/n8n-webhook.mjs",
+    "example:universal": "npm run build && node examples/universal-adapters.mjs",
+    "example:inbox": "npm run build && node examples/inbox-server.mjs"
   },
   "keywords": [
     "ai",
     "agents",
     "approval",
+    "validation",
     "human-in-the-loop",
     "workflow",
     "policy",
     "n8n",
     "claude",
+    "openai",
+    "gemini",
+    "mcp",
+    "langchain",
     "automation"
   ],
   "license": "MIT",

@@ -1,36 +1,62 @@
 # human-hooks
 
-**Pause before damage.**
+**Pause before damage. Approve before regret.**
 
-`human-hooks` is a provider-neutral approval and policy engine for AI tools, agents, workflow automations, and tomorrow's weird little software goblins.
+`human-hooks` is a universal **validation, approval, and audit layer** for AI tools, automations, bots, workflow engines, and future agent runtimes.
 
-It is built to sit at the **decision boundary** between:
+It is built to sit at the dangerous seam where software moves from **thinking** to **doing**:
 
-- an AI system that wants to do something
-- a human who may need to review it
-- a real-world system that can be damaged by a bad action
+- spending money
+- publishing content
+- changing permissions
+- touching production
+- exporting data
+- changing code or infrastructure
+- contacting real humans
+- handling secrets, contracts, or regulated surfaces
 
-That makes it useful for:
+That makes it useful not just for finance, but for almost any project where an AI or automation may need validation before acting.
 
-- Claude-compatible tool use
-- OpenAI-style tool runners
-- n8n workflows
-- bot automations like Clawdbot or Moltbot
-- queue workers
-- backend APIs
-- anything else that can normalize actions into a `GuardRequest`
+## Why it exists
 
-## What is new in this version
+Every team is building automations now. Very few teams have a clean, reusable way to answer:
 
-- durable **file-backed review store**
-- **multi-approver** workflows
-- **risk scoring** and severity levels
-- **deduping** via request fingerprinting
-- **expiry / SLA** support for stale reviews
-- **signed approval tokens** for links or external UIs
-- **event sinks** and signed webhooks
-- **fetch-native API handler** for workers, Next, Bun, Hono, or Node
-- adapters for **Claude-compatible**, **n8n**, and generic bot automation envelopes
+- Should this action be blocked, approved, or allowed?
+- Who needs to review it?
+- How risky is it?
+- Can we prove what happened later?
+- Can this work across Claude, OpenAI-style tools, MCP, n8n, bots, and whatever weird workflow creature shows up next?
+
+`human-hooks` is the answer to that seam.
+
+## What is in v0.4
+
+- provider-neutral **review engine**
+- universal **validation policies** for money, access, secrets, data export, destructive actions, legal surfaces, publishing, infra changes, and production risk
+- **multi-approver** workflows, expiry, deduping, signed approval links, and audit history
+- durable **memory** and **file-backed** stores
+- **event sinks**, webhook fanout, and signed webhooks
+- **fetch-native API** for workers, Bun, Next, Hono, Node, or serverless runtimes
+- lightweight **approval inbox UI** at `/app`
+- adapters for **Claude-compatible**, **OpenAI-compatible**, **Gemini-style**, **MCP**, **LangChain**, **n8n**, **workflow tools**, and generic bots
+- role/queue-aware **reviewer authorizer** helper
+- clean summaries for inboxes, dashboards, Slack posts, or internal tools
+
+## What this is good for
+
+This library is intentionally broad. It is designed to become a default component in projects that need human validation.
+
+### Common use cases
+
+- AI support agents issuing refunds, credits, or account changes
+- AI copilots drafting and sending external emails or bulk messages
+- workflow tools posting to Slack, CRMs, webhooks, or email platforms
+- bots rotating keys, changing secrets, or touching vaults
+- automations exporting customer or employee data
+- deploy/release bots touching production or schema migrations
+- internal tooling that needs a review queue and audit trail
+- content publishing pipelines that must pause before going public
+- regulated or compliance-heavy systems that need sign-off evidence
 
 ## Install
 
@@ -38,271 +64,179 @@ That makes it useful for:
 npm install human-hooks
 ```
 
-## Core idea
-
-Your runtime stays yours.
-
-`human-hooks` does **not** try to become the model provider, the orchestrator, or the giant monolith from framework heaven. It stays thin.
-
-1. your tool runner decides it wants to act
-2. you normalize the action to a `GuardRequest`
-3. `human-hooks` evaluates policies
-4. the action either executes or pauses for approval
-5. when approved, your runtime resumes the action however you want
-
-That design is what keeps it future-proof.
-
 ## Quick start
 
 ```ts
 import {
-  amountAbove,
-  confidenceBelow,
   createReviewEngine,
+  createUniversalValidationPolicies,
   fileReviewStore,
-  policy,
 } from 'human-hooks';
 
 const engine = createReviewEngine({
   store: fileReviewStore('./data/reviews.json'),
-  defaultQueue: 'ops',
-  policies: [
-    policy({
-      name: 'high-value-refund',
-      queue: 'finance',
-      severity: 'high',
-      score: 40,
-      reason: 'Refund amount is above the automatic threshold.',
-      when: amountAbove(100),
-    }),
-    policy({
-      name: 'low-confidence',
-      queue: 'ops',
-      severity: 'medium',
-      score: 15,
-      reason: 'The model is not confident enough for automatic execution.',
-      when: confidenceBelow(0.8),
-    }),
-  ],
+  policies: createUniversalValidationPolicies({
+    spendThreshold: 250,
+    confidenceThreshold: 0.82,
+    bulkRecipientThreshold: 2000,
+    corporateDomains: ['yourcompany.com'],
+  }),
 });
 
 const decision = await engine.guard({
-  action: 'refund.create',
+  action: 'email.send',
   actor: { id: 'agent_support_1', type: 'agent' },
   provider: 'claude',
-  payload: { amount: 180, currency: 'USD' },
-  meta: { confidence: 0.72 },
-  tags: ['refund'],
+  payload: {
+    recipientEmail: 'customer@gmail.com',
+    subject: 'Account update',
+    body: '...',
+  },
+  meta: { confidence: 0.71 },
+  tags: ['external'],
 });
 
 if (decision.status === 'needs_review') {
-  console.log(decision.review.id, decision.review.riskScore, decision.review.severity);
+  console.log(decision.review.id, decision.review.queue, decision.review.severity);
 }
 ```
 
-## Multi-approver review
+## Universal policy packs
+
+Use the included preset pack when you want a solid default for real projects.
 
 ```ts
-import { amountAbove, createReviewEngine, memoryReviewStore, policy } from 'human-hooks';
+import { createUniversalValidationPolicies } from 'human-hooks';
 
-const engine = createReviewEngine({
-  store: memoryReviewStore(),
-  policies: [
-    policy({
-      name: 'wire-transfer',
-      queue: 'finance',
-      severity: 'critical',
-      score: 80,
-      requiredApprovals: 2,
-      reason: 'Wire transfer requires dual approval.',
-      when: amountAbove(1000),
-    }),
-  ],
+const policies = createUniversalValidationPolicies({
+  spendThreshold: 500,
+  confidenceThreshold: 0.8,
+  bulkRecipientThreshold: 1000,
+  exportRecordThreshold: 1000,
+  corporateDomains: ['example.com'],
 });
 ```
 
-The first approval records progress. The second one finalizes the review.
+Included validation categories:
 
-## Signed approval links
+- large spend / money movement
+- low-confidence actions
+- bulk outreach
+- destructive operations
+- production + PII
+- permission / access changes
+- secrets / credentials / key material
+- external communication
+- bulk data export
+- code / infra / database mutations
+- legal / policy / compliance surfaces
+
+## Provider adapters
+
+You can use specific adapters or auto-detect with `normalizeGuardRequest()`.
+
+Supported adapter entry points:
+
+- `fromClaudeToolUse()`
+- `fromOpenAIToolCall()`
+- `fromGeminiFunctionCall()`
+- `fromMcpToolCall()`
+- `fromLangChainAction()`
+- `fromN8nItem()`
+- `fromWorkflowStep()` for Make, Zapier, Pipedream-style steps
+- `fromBotAutomation()` for custom bots such as Clawdbot/Moltbot-style automation envelopes
+- `fromToolEnvelope()` for generic normalized inputs
+- `normalizeGuardRequest()` for mixed environments
+
+## Approval inbox UI
+
+The fetch handler now serves a minimal review UI at `/app`.
 
 ```ts
-import { createSignedReviewToken } from 'human-hooks';
-
-const token = createSignedReviewToken(
-  {
-    reviewId: 'review_123',
-    action: 'approve',
-    actorId: 'esteban',
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  },
-  process.env.HUMAN_HOOKS_SECRET,
-);
-```
-
-That token can be posted into Slack, email, or any internal UI and verified later by the fetch handler.
-
-## Fetch-native API
-
-```ts
-import { createReviewEngine, createReviewFetchHandler, memoryReviewStore } from 'human-hooks';
+import {
+  createQueueAuthorizer,
+  createReviewEngine,
+  createReviewFetchHandler,
+  createUniversalValidationPolicies,
+  fileReviewStore,
+} from 'human-hooks';
 
 const engine = createReviewEngine({
-  store: memoryReviewStore(),
-  policies: [],
-});
-
-const handler = createReviewFetchHandler(engine, {
-  tokenSecret: process.env.HUMAN_HOOKS_SECRET,
+  store: fileReviewStore('./data/reviews.json'),
+  policies: createUniversalValidationPolicies({
+    corporateDomains: ['example.com'],
+  }),
+  reviewerAuthorizer: createQueueAuthorizer({
+    globalApprovers: ['owner'],
+    queueApprovers: {
+      security: ['security-lead'],
+      finance: ['finance-lead'],
+    },
+  }),
 });
 
 export default {
-  fetch: handler,
+  fetch: createReviewFetchHandler(engine, {
+    tokenSecret: process.env.HUMAN_HOOKS_SECRET,
+    appTitle: 'human-hooks inbox',
+  }),
 };
 ```
 
 Routes:
 
-- `GET /reviews`
+- `GET /app`
+- `GET /reviews?status=pending|all|approved|rejected|executed|expired`
 - `GET /reviews/:id`
+- `GET /reviews/:id/summary`
+- `GET /stats`
 - `POST /guard`
+- `POST /guard/batch`
 - `POST /reviews/:id/approve`
 - `POST /reviews/:id/reject`
+- `POST /reviews/:id/execute`
 
-## Claude-compatible example
-
-```ts
-import { createReviewEngine, fromClaudeToolUse, memoryReviewStore, policy, amountAbove } from 'human-hooks';
-
-const engine = createReviewEngine({
-  store: memoryReviewStore(),
-  policies: [
-    policy({
-      name: 'high-spend',
-      queue: 'finance',
-      severity: 'high',
-      score: 50,
-      reason: 'Spending above threshold requires review.',
-      when: amountAbove(500),
-    }),
-  ],
-});
-
-const request = fromClaudeToolUse({
-  toolName: 'issue_refund',
-  input: { amount: 650, currency: 'USD' },
-  confidence: 0.91,
-  sessionId: 'sess_123',
-  messageId: 'msg_123',
-});
-
-const decision = await engine.guard(request);
-```
-
-## n8n example
+## Role-aware approver rules
 
 ```ts
-import { createReviewEngine, fromN8nItem, toN8nReviewResponse } from 'human-hooks';
+import { createQueueAuthorizer } from 'human-hooks';
 
-const request = fromN8nItem({
-  json: {
-    action: 'email.send',
-    actorId: 'workflow_marketing_1',
-    confidence: 0.62,
-    payload: {
-      subject: 'Launch blast',
-      recipientCount: 10000,
-    },
+const reviewerAuthorizer = createQueueAuthorizer({
+  globalApprovers: ['owner'],
+  queueApprovers: {
+    security: ['alice'],
+    finance: ['bob'],
+    communications: ['carol'],
   },
 });
-
-const decision = await engine.guard(request);
-if (decision.status === 'needs_review') {
-  return [toN8nReviewResponse(decision.review.id)];
-}
 ```
 
-## Bot automation example
+## Examples
 
-This is the generic adapter for custom bots, including setups shaped like Clawdbot or Moltbot:
+- `npm run example:basic`
+- `npm run example:claude`
+- `npm run example:n8n`
+- `npm run example:universal`
+- `npm run example:inbox`
 
-```ts
-import { fromBotAutomation } from 'human-hooks';
+## Ownership and liability notes
 
-const request = fromBotAutomation({
-  botName: 'clawdbot',
-  task: 'repo.delete_branch',
-  payload: { repo: 'team/app', branch: 'legacy-prod' },
-  confidence: 0.77,
-  runId: 'run_001',
-  tags: ['repo', 'destructive'],
-});
-```
+This repository is already set up with:
 
-## Event sinks and webhooks
+- your ownership in the copyright notice
+- an MIT license with an **"AS IS"** warranty disclaimer and limitation of liability language
+- contributor and security docs
+- template legal notes for hosted-service use
 
-```ts
-import { createEventFanout, createReviewEngine, memoryEventSink, webhookEventSink } from 'human-hooks';
+Important reality check: no open-source license or README spell can guarantee total future liability immunity in every jurisdiction or deployment model. It does, however, give you the standard warranty/liability disclaimer most software projects use. If you plan to run this as a hosted service or sell it to customers, you should add proper terms of service and have a lawyer review them.
 
-const engine = createReviewEngine({
-  store: memoryReviewStore(),
-  eventSink: createEventFanout(
-    memoryEventSink(),
-    webhookEventSink({
-      url: 'https://example.com/review-events',
-      secret: process.env.HUMAN_HOOKS_SECRET,
-    }),
-  ),
-  policies: [],
-});
-```
+See:
 
-Emitted events include:
-
-- `review.created`
-- `review.reused`
-- `review.approval_recorded`
-- `review.approved`
-- `review.rejected`
-- `review.expired`
-- `review.executed`
-
-## Suggested architecture for a serious product
-
-```text
-packages/
-  core/
-  adapters/
-    claude/
-    openai/
-    n8n/
-    bots/
-  ui/
-    react/
-    web/
-  workers/
-    webhooks/
-```
-
-## What still belongs on the roadmap
-
-- Postgres / Redis production stores
-- React approval inbox
-- Slack / Discord action cards
-- policy pack marketplace
-- replay + resume helpers for agent runtimes
-- signed audit export for compliance
-- MCP server wrapper
-
-## Development
-
-```bash
-npm run check
-npm test
-npm run build
-npm run example:basic
-npm run example:claude
-npm run example:n8n
-```
+- `LICENSE`
+- `docs/legal-ownership-and-risk.md`
+- `docs/hosted-service-terms-template.md`
+- `SECURITY.md`
+- `CONTRIBUTING.md`
 
 ## License
 

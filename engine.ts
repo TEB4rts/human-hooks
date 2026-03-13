@@ -8,8 +8,11 @@ import type {
   ReviewActor,
   ReviewEngineOptions,
   ReviewEvent,
+  ReviewEventName,
+  ReviewHistoryEntry,
   ReviewRecord,
   ReviewSeverity,
+  ReviewStats,
   WrappedActionResult,
   WrapActionOptions,
 } from './types.js';
@@ -56,6 +59,11 @@ export class ReviewEngine {
       : null;
 
     if (existing && !this.isExpired(existing)) {
+      appendHistory(existing, this.createHistoryEntry('review.reused', existing.status, undefined, undefined, {
+        fingerprint,
+      }, this.now));
+      existing.updatedAt = nowIso(this.now());
+      await this.store.put(existing);
       await this.publish('review.reused', existing);
       return {
         status: 'needs_review',
@@ -75,6 +83,16 @@ export class ReviewEngine {
     };
   }
 
+  async guardMany<TPayload extends JsonMap = JsonMap, TMeta extends JsonMap = JsonMap>(
+    requests: GuardRequest<TPayload, TMeta>[],
+  ): Promise<GuardDecision[]> {
+    const decisions: GuardDecision[] = [];
+    for (const request of requests) {
+      decisions.push(await this.guard(request));
+    }
+    return decisions;
+  }
+
   async approve(id: string, actor: ReviewActor, note?: string): Promise<ReviewRecord> {
     const review = await this.getRequiredReview(id);
     await this.assertReviewerAllowed(review, actor);
@@ -92,6 +110,10 @@ export class ReviewEngine {
         at: nowIso(this.now()),
         decision: 'approve',
       });
+      appendHistory(activeReview, this.createHistoryEntry('review.approval_recorded', activeReview.status, actor, note, {
+        approvalsRecorded: countApprovals(activeReview),
+        requiredApprovals: activeReview.requiredApprovals,
+      }, this.now));
     }
 
     activeReview.updatedAt = nowIso(this.now());
@@ -105,6 +127,9 @@ export class ReviewEngine {
         at: nowIso(this.now()),
       };
       activeReview.updatedAt = nowIso(this.now());
+      appendHistory(activeReview, this.createHistoryEntry('review.approved', activeReview.status, actor, note, {
+        approvalsRecorded: countApprovals(activeReview),
+      }, this.now));
       await this.store.put(activeReview);
       await this.publish('review.approved', activeReview);
       return activeReview;
@@ -136,6 +161,7 @@ export class ReviewEngine {
       at: nowIso(this.now()),
     };
     activeReview.updatedAt = nowIso(this.now());
+    appendHistory(activeReview, this.createHistoryEntry('review.rejected', activeReview.status, actor, note, undefined, this.now));
     await this.store.put(activeReview);
     await this.publish('review.rejected', activeReview);
     return activeReview;
@@ -155,6 +181,7 @@ export class ReviewEngine {
         output,
       };
       review.updatedAt = nowIso(this.now());
+      appendHistory(review, this.createHistoryEntry('review.executed', review.status, actor, undefined, output, this.now));
       await this.store.put(review);
       await this.publish('review.executed', review);
     }
@@ -177,6 +204,48 @@ export class ReviewEngine {
       output.push(await this.expireIfNeeded(review));
     }
     return output.filter((review) => review.status === 'pending');
+  }
+
+  async listAll(queue?: string): Promise<ReviewRecord[]> {
+    if (this.store.listAll) {
+      const reviews = await this.store.listAll(queue);
+      const output: ReviewRecord[] = [];
+      for (const review of reviews) {
+        output.push(await this.expireIfNeeded(review));
+      }
+      return output;
+    }
+    return this.listPending(queue);
+  }
+
+  async getStats(queue?: string): Promise<ReviewStats> {
+    const reviews = await this.listAll(queue);
+    const bySeverity: ReviewStats['bySeverity'] = {
+      low: 0,
+      medium: 0,
+      high: 0,
+      critical: 0,
+    };
+    const byQueue: Record<string, number> = {};
+
+    const stats: ReviewStats = {
+      total: reviews.length,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      expired: 0,
+      executed: 0,
+      bySeverity,
+      byQueue,
+    };
+
+    for (const review of reviews) {
+      bySeverity[review.severity] += 1;
+      byQueue[review.queue] = (byQueue[review.queue] ?? 0) + 1;
+      stats[review.status] += 1;
+    }
+
+    return stats;
   }
 
   async waitForApproval(id: string): Promise<ApprovalOutcome> {
@@ -250,8 +319,7 @@ export class ReviewEngine {
 
     const severity = matches.reduce<ReviewSeverity>((current, match) => maxSeverity(current, match.severity), 'low');
     const updatedAt = nowIso(now);
-
-    return {
+    const review: ReviewRecord<TPayload, TMeta> = {
       id: this.idGenerator(),
       status: 'pending',
       action: request.action,
@@ -268,6 +336,34 @@ export class ReviewEngine {
       request,
       fingerprint,
       approvals: [],
+      history: [],
+    };
+
+    appendHistory(review, this.createHistoryEntry('review.created', review.status, request.actor, undefined, {
+      queue: review.queue,
+      policyNames: review.policyNames,
+      riskScore: review.riskScore,
+    }, () => now));
+
+    return review;
+  }
+
+  private createHistoryEntry(
+    type: ReviewEventName,
+    status: ReviewRecord['status'],
+    actor?: ReviewActor,
+    note?: string,
+    data?: JsonMap,
+    now: () => Date = this.now,
+  ): ReviewHistoryEntry {
+    return {
+      id: createId('hist'),
+      type,
+      at: nowIso(now()),
+      status,
+      actor,
+      note,
+      data,
     };
   }
 
@@ -292,6 +388,7 @@ export class ReviewEngine {
 
     review.status = 'expired';
     review.updatedAt = nowIso(this.now());
+    appendHistory(review, this.createHistoryEntry('review.expired', review.status, undefined, undefined, undefined, this.now));
     await this.store.put(review);
     await this.publish('review.expired', review);
     return review;
@@ -343,4 +440,8 @@ function chooseQueue(matches: PolicyMatch[], fallback: string): string {
     return critical.queue;
   }
   return matches[0]?.queue ?? fallback;
+}
+
+function appendHistory(review: ReviewRecord, entry: ReviewHistoryEntry): void {
+  review.history = [...(Array.isArray(review.history) ? review.history : []), entry];
 }

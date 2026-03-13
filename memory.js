@@ -13,6 +13,11 @@ export class MemoryReviewStore {
             .filter((review) => review.status === 'pending' && (!queue || review.queue === queue))
             .map((review) => jsonClone(review));
     }
+    async listAll(queue) {
+        return Array.from(this.reviews.values())
+            .filter((review) => !queue || review.queue === queue)
+            .map((review) => jsonClone(review));
+    }
     async put(review) {
         this.reviews.set(review.id, jsonClone(review));
         return jsonClone(review);

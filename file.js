@@ -22,6 +22,12 @@ export class FileReviewStore {
             .filter((review) => review.status === 'pending' && (!queue || review.queue === queue))
             .map((review) => jsonClone(review));
     }
+    async listAll(queue) {
+        const db = await this.readDb();
+        return db.reviews
+            .filter((review) => !queue || review.queue === queue)
+            .map((review) => jsonClone(review));
+    }
     async put(review) {
         const db = await this.readDb();
         const index = db.reviews.findIndex((item) => item.id === review.id);

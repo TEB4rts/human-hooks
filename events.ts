@@ -10,8 +10,18 @@ export class MemoryEventSink implements ReviewEventSink {
   }
 }
 
+export class ConsoleEventSink implements ReviewEventSink {
+  async publish(event: ReviewEvent): Promise<void> {
+    console.log(`[human-hooks] ${event.type} ${event.reviewId} ${event.status} score=${event.riskScore}`);
+  }
+}
+
 export function memoryEventSink(): MemoryEventSink {
   return new MemoryEventSink();
+}
+
+export function consoleEventSink(): ConsoleEventSink {
+  return new ConsoleEventSink();
 }
 
 export function createEventFanout(...sinks: ReviewEventSink[]): ReviewEventSink {

@@ -30,3 +30,10 @@ export function verifySignedReviewToken(token, secret) {
     }
     return payload;
 }
+export function createSignedReviewActionLink(baseUrl, payload, secret) {
+    const url = new URL(baseUrl);
+    url.searchParams.set('token', createSignedReviewToken(payload, secret));
+    url.searchParams.set('reviewId', payload.reviewId);
+    url.searchParams.set('action', payload.action);
+    return url.toString();
+}
